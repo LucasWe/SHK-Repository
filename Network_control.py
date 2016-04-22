@@ -151,7 +151,7 @@ changeInterfaceFile ("1","3","enp0s3")
 #this will return the former config to the DHCP Server
 #copyDoc("/home/lucas/Schreibtisch/config 1.2", "/etc/dhcp/dhcpd.conf")
 
-
+#Ich werde hiermit mal SmartGit nutzen. Mal schauen, ob ich das nun comitten muss
 
 #configure the DHCP-Server, that it will give the Controller one static IP
 #Server starten, damit die IP-Addressen bezogen werden koennen
