@@ -100,7 +100,7 @@ def changeInterfaceFile (boxnumber, clientnumber, cardname="enp0s3"):
 	getInterface(boxnumber,clientnumber)	
 	copyDoc("/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber), "/home/lucas/interfaces.%s.%s_SAFE" % (boxnumber,clientnumber))
 	interface = open ("/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber), "w")
-	text="# interfaces(5) file used by ifup(8) and ifdown(8)\nauto %s inet static\naddress 192.168.%s.%s\nnetmask 255.255.255.255.0\nbroadcast 192.168.1.255\n" % (cardname,boxnumber,clientnumber)
+	text="# interfaces(5) file used by ifup(8) and ifdown(8)\nauto lo\n\nauto %s\niface %s inet static\naddress 192.168.%s.%s\nnetmask 255.255.255.255.0\nbroadcast 192.168.1.255\n" % (cardname,cardname,boxnumber,clientnumber)
 	interface.write(text)
 	interface.close()
 	putInterfaces(boxnumber, clientnumber)
@@ -116,7 +116,7 @@ def putInterfaces (boxnumber, clientnumber):
 	sftp = client.open_sftp()
 	sftp.put("/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber), "/home/lucas/interfaces")
 	sftp.close()	
-	
+	client.close()
 		
 	client = paramiko.SSHClient()
 	myKey = os.path.expanduser("~/.ssh/id_rsa")
