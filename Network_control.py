@@ -24,13 +24,22 @@ def openClient (ip, user, password):
 
 #Willkommen heissen
 def welcome ():	
-	print "Willkommen. Ich starte nun hoffentlich den DHCP-Server"
+	print "Willkommen. Dieses Programm wird nun zuallererst den DHCP-Server konfigurieren."
 	print "Mal sehen..."
+	print "Danach wird einem Netzwerkteilnehmer eine statische IP zugewiesen."
 
 # funtion to start or restart the DHCP server
-def serverStart ():
+def serverRestart ():
 	os.system("sudo /etc/init.d/isc-dhcp-server stop")
 	os.system("sudo /etc/init.d/isc-dhcp-server start")
+
+#a function to start the dhcp server
+def serverStart ():
+	os.system("sudo /etc/init.d/isc-dhcp-server start")
+
+# a function to stop the dhcp server
+def serverStop():
+	os.system("sudo /etc/init.d/isc-dhcp-server stop")
 
 #a function to find out the Controller MAC (mac will be returned as a string)
 def getMac ():
@@ -131,19 +140,27 @@ def restartNetDev ():
 	client.exec_command("echo %s | sudo -S -- /etc/init.d/networking restart" %Passwort)
 	print "Die Netzwerkkarte von %s wird nun neu gestartet." % Hostname	
 	#somehow it needs some short time to restart, otherweise if the client is closed
-	#immediatly the natwork device won't restart properly	
+	#immediatly the natwork device won't restart properly		
 	time.sleep(1)	
 	client.close()
+
+#a control function for the validation of the Ip change
+def controlIP ():
+	print "Momentan bin ich nutzlos"
 	
 	
 
 #Here the main program is starting
-#welcome()
-#host("192.168.1.1", "controller",getMac())
-#staticIP("1","1")
-
+welcome()
+host("192.168.1.1", "controller",getMac())
+serverStart()
+	#we have to sleep for a sec, because the clients have to get their IP
+print "Beginne zu schlafen."
+time.sleep(8)
+print "Stoppe zu schlafen."
 changeInterfaceFile (box,odroid,"enp0s3")
 restartNetDev()
+serverStop()
 
 
 #this will return the former config to the DHCP Server
