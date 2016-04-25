@@ -11,6 +11,14 @@ Passwort = "123456"
 Schaddresse = "~/.ssh/id_rsa"
 Hostname = "192.168.1.2"
 
+#opening an ssh client with the global veriables set above
+def openClient (ip, user, password):
+	client = paramiko.SSHClient()
+	client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+	client.connect(ip, username=user, password=password)
+	print "Ein neuer SSH-Client wurde geoeffnet."
+	return client
+
 #Willkommen heissen
 def welcome ():	
 	print "Willkommen. Ich starte nun hoffentlich den DHCP-Server"
@@ -83,11 +91,7 @@ def sshConnect (name="id_rsa"):
 
 #a function, that copies the Teilnehmers interface file to a local path
 def getInterface (boxnumber, clientnumber):		
-	client = paramiko.SSHClient()
-	myKey = os.path.expanduser("~/.ssh/id_rsa")
-	client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-	client.connect("192.168.1.2", username="lucas", password="123456")
-	print "Der Controller hat sich nun mit dem Teilnehmer verbunden."	
+	client = openClient(Hostname,User,Passwort)	
 	sftp = client.open_sftp()
 	sftp.get("/etc/network/interfaces", "/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber))
 	sftp.close()
@@ -108,33 +112,21 @@ def changeInterfaceFile (boxnumber, clientnumber, cardname="enp0s3"):
 
 #a function that copies back the Interface file
 def putInterfaces (boxnumber, clientnumber):
-	client = paramiko.SSHClient()
-	myKey = os.path.expanduser("~/.ssh/id_rsa")
-	client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-	client.connect("192.168.1.2", username="lucas", password="123456")
-	print "Der Controller hat sich nun mit dem Teilnehmer verbunden."
+	client = client = openClient(Hostname,User,Passwort)
 	sftp = client.open_sftp()
 	sftp.put("/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber), "/home/lucas/interfaces")
 	sftp.close()	
 	client.close()
 		
-	client = paramiko.SSHClient()
-	myKey = os.path.expanduser("~/.ssh/id_rsa")
-	client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-	client.connect("192.168.1.2", username="lucas", password="123456")
-	print "Der Controller hat sich nun mit dem Teilnehmer verbunden."
-	stdin, stdout, stderr = client.exec_command("sudo mv /home/lucas/interfaces /etc/network/interfaces")
+	client = client = openClient(Hostname,User,Passwort)
+	stdin, stdout, stderr = client.exec_command("echo %s | sudo -S -- mv /home/lucas/interfaces /etc/network/interfaces" % Passwort)
 	for line in stdout:
 		print line.strip("\n")
 	client.close()
 
 #a function to remotely restart the network device of the client to activate any changes
 def restartNetDev ():
-	client = paramiko.SSHClient()
-	myKey = os.path.expanduser("~/.ssh/id_rsa")
-	client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-	client.connect("192.168.1.2", username="lucas", password="123456")
-	print "Der Controller hat sich nun mit dem Teilnehmer verbunden."	
+	client = openClient(Hostname,User,Passwort)	
 	client.exec_command("/etc/init.d/networking restart")
 	client.close()
 	
