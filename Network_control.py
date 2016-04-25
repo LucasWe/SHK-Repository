@@ -4,12 +4,15 @@ import sys
 import subprocess
 import re
 import paramiko
+import time
 
 #Die Einstellungen fuer die SSH verbindung
 User = "lucas"
 Passwort = "123456"
 Schaddresse = "~/.ssh/id_rsa"
 Hostname = "192.168.1.2"
+box = "4"
+odroid = "3"
 
 #opening an ssh client with the global veriables set above
 def openClient (ip, user, password):
@@ -79,7 +82,7 @@ def host (ip, name, mac):
 	elif not givenText.find(mac)==-1:
 		print "Die MAC-Addresse ist bereits einer IP zugeordnet.\nDie Config wurde nicht geaendert."
 
-#a function to open a ssh to another client
+"""#a function to open a ssh to another client
 def sshConnect (name="id_rsa"):
 	client = paramiko.SSHClient()
 	myKey = os.path.expanduser("~/.ssh/%s" % name)
@@ -87,7 +90,7 @@ def sshConnect (name="id_rsa"):
 	#client.connect("192.168.1.2", username="lucas", key_filename=myKey)
 	client.connect("192.168.1.2", username="lucas", password="123456")
 	print "Der Controller hat sich nun mit dem Teilnehmer verbunden."
-	client.close()
+	client.close()"""
 
 #a function, that copies the Teilnehmers interface file to a local path
 def getInterface (boxnumber, clientnumber):		
@@ -104,7 +107,7 @@ def changeInterfaceFile (boxnumber, clientnumber, cardname="enp0s3"):
 	getInterface(boxnumber,clientnumber)	
 	copyDoc("/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber), "/home/lucas/interfaces.%s.%s_SAFE" % (boxnumber,clientnumber))
 	interface = open ("/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber), "w")
-	text="# interfaces(5) file used by ifup(8) and ifdown(8)\nauto lo\n\nauto %s\niface %s inet static\naddress 192.168.%s.%s\nnetmask 255.255.255.255.0\nbroadcast 192.168.1.255\n" % (cardname,cardname,boxnumber,clientnumber)
+	text="# interfaces(5) file used by ifup(8) and ifdown(8)\nauto lo\n\nauto %s\niface %s inet static\n\taddress 192.168.%s.%s\n\tnetmask 255.255.255.0\n\tbroadcast 192.168.1.255\n" % (cardname,cardname,boxnumber,clientnumber)
 	interface.write(text)
 	interface.close()
 	putInterfaces(boxnumber, clientnumber)
@@ -120,14 +123,16 @@ def putInterfaces (boxnumber, clientnumber):
 		
 	client = client = openClient(Hostname,User,Passwort)
 	stdin, stdout, stderr = client.exec_command("echo %s | sudo -S -- mv /home/lucas/interfaces /etc/network/interfaces" % Passwort)
-	for line in stdout:
-		print line.strip("\n")
 	client.close()
 
 #a function to remotely restart the network device of the client to activate any changes
 def restartNetDev ():
 	client = openClient(Hostname,User,Passwort)	
-	client.exec_command("/etc/init.d/networking restart")
+	client.exec_command("echo %s | sudo -S -- /etc/init.d/networking restart" %Passwort)
+	print "Die Netzwerkkarte von %s wird nun neu gestartet." % Hostname	
+	#somehow it needs some short time to restart, otherweise if the client is closed
+	#immediatly the natwork device won't restart properly	
+	time.sleep(1)	
 	client.close()
 	
 	
@@ -137,7 +142,8 @@ def restartNetDev ():
 #host("192.168.1.1", "controller",getMac())
 #staticIP("1","1")
 
-changeInterfaceFile ("1","3","enp0s3")
+changeInterfaceFile (box,odroid,"enp0s3")
+restartNetDev()
 
 
 #this will return the former config to the DHCP Server
