@@ -14,6 +14,7 @@ Hostname = "192.168.1.2"
 box = "1"
 odroid = "3"
 
+#a function 
 #opening an ssh client with the global veriables set above
 def openClient (ip, user, password):
 	client = paramiko.SSHClient()
@@ -185,6 +186,11 @@ def wait4Client ():
 			serverStop()
 			sys.exit()
 
+#a funtion to end the lease of the IP for the client
+def leasedelete ()
+	os.system("rm -f /var/lib/dhcp/dhcpd.leases")
+	print "Die leases des DHCP-Servers wurden gelöscht."
+
 # a function to undo the changes on the controller
 def undo ()	
 	copyfile("/home/lucas/Schreibtisch/interfaces", "/etc/network/interfaces")
@@ -194,15 +200,17 @@ def undo ()
 
 #Here the main program is starting
 welcome()
-host("192.168.1.1", "controller",getMac())
+host("192.168.%s.1" % box, "controller",getMac())
 
+	serverStart()
+	wait4Client()
+	changeInterfaceFile (box,odroid,"enp0s3")
+	restartNetDev("client")
+	serverStop()
+	leasesdelete()
 
-serverStart()
-wait4Client()
-changeInterfaceFile (box,odroid,"enp0s3")
-restartNetDev("client")
-serverStop()
 controllerIP(box,"enp0s3")
+
 
 
 #this will return the former config to the DHCP Server
