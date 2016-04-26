@@ -185,16 +185,25 @@ def wait4Client ():
 			serverStop()
 			sys.exit()
 
+# a function to undo the changes on the controller
+def undo ()	
+	copyfile("/home/lucas/Schreibtisch/interfaces", "/etc/network/interfaces")
+	time.sleep(2)
+	subprocess.call("sudo /etc/init.d/isc-dhcp-server stop")
+	subprocess.call("sudo /etc/init.d/networking restart", shell= True)
 
 #Here the main program is starting
 welcome()
 host("192.168.1.1", "controller",getMac())
+
+
 serverStart()
 wait4Client()
 changeInterfaceFile (box,odroid,"enp0s3")
 restartNetDev("client")
 serverStop()
 controllerIP(box,"enp0s3")
+
 
 #this will return the former config to the DHCP Server
 #copyDoc("/home/lucas/Schreibtisch/config 1.2", "/etc/dhcp/dhcpd.conf")
