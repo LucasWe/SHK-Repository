@@ -13,8 +13,28 @@ Schaddresse = "~/.ssh/id_rsa"
 Hostname = "192.168.1.2"
 box = "1"
 odroid = "3"
+clientnumber = "1"
 
-#a function 
+#I need to add a function, that sets up the config of the DHCP-Server (Subnetz, given Ips, usw.)!!
+
+#a function that asks the user for the boxnumber an the number of connected odroids
+def setup ():
+	print "Die Nummer der Box kann von 0 bis 9 gehen."	
+	boxnumber = raw_input("Bitte geben sie die Nummer der Box ein (default= 1): ")
+	print "Die Anzahl der Odroids kann von 1 bis 64 gehen."	
+	clientnum = raw_input("Bitte geben sie die Anzahl der angeschlossenen Odroids an: ")
+	inti = 0	
+	while inti <= 9:	
+		if boxnumber == "%i" % inti:
+			box=boxnumber
+		inti = inti +1
+	inti = 1	
+	while inti <= 64:
+		if clientnum == "%i" % inti:
+			clientnumber = clientnum
+			
+		inti = inti +1
+
 #opening an ssh client with the global veriables set above
 def openClient (ip, user, password):
 	client = paramiko.SSHClient()
@@ -167,32 +187,35 @@ def controlIP ():
 
 #a function, that waits till the client has got its IP
 def wait4Client ():
-	arptext = ""
 	inti = 0
 	clientip = ""
 	while clientip != "192.168.1.2":	
-		arptext = subprocess.check_output(["arp -a"],shell=True)
-		clientip = re.search(r"192.168.1.2",arptext)
+		leases = open ("/var/lib/dhcp/dhcpd.leases", "r")
+		leasestext = leases.read()
+		clientip = re.search(r"192.168.1.2",leasestext)
 		try: 
 			clientip = clientip.group()
 		
 		except:
-			print "Client ist noch nicht verbunden."
+			print "Client ist noch nicht verbunden (Versuch %i/15)." % inti
 		inti = inti + 1
 		time.sleep(1)
-		print "Zeit seit dem Start des DHCP-Servers: %i Sekunden" % inti
+		leases.close()
 		if inti >= 15:
 			print "Ein Verbindungsaufbau war nicht moeglich (timeout)."			
 			serverStop()
 			sys.exit()
 
 #a funtion to end the lease of the IP for the client
-def leasedelete ()
-	os.system("rm -f /var/lib/dhcp/dhcpd.leases")
-	print "Die leases des DHCP-Servers wurden gelöscht."
+def leasesdelete ():
+	leasestext = open ("/var/lib/dhcp/dhcpd.leases", "w")
+	leer =""
+	leasestext.write(leer)
+	leasestext.close()
+	print "Die leases des DHCP-Servers wurden geloescht."
 
 # a function to undo the changes on the controller
-def undo ()	
+def undo ():	
 	copyfile("/home/lucas/Schreibtisch/interfaces", "/etc/network/interfaces")
 	time.sleep(2)
 	subprocess.call("sudo /etc/init.d/isc-dhcp-server stop")
@@ -201,14 +224,13 @@ def undo ()
 #Here the main program is starting
 welcome()
 host("192.168.%s.1" % box, "controller",getMac())
-
-	serverStart()
-	wait4Client()
-	changeInterfaceFile (box,odroid,"enp0s3")
-	restartNetDev("client")
-	serverStop()
-	leasesdelete()
-
+setup()
+serverStart()
+wait4Client()
+changeInterfaceFile (box,odroid,"enp0s3")
+restartNetDev("client")
+serverStop()
+leasesdelete()
 controllerIP(box,"enp0s3")
 
 
