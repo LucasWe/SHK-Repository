@@ -1,0 +1,10 @@
+#!/usr/bin/python
+import os
+import sys
+import subprocess
+import time
+
+copyfile("/home/lucas/Schreibtisch/interfaces", "/etc/network/interfaces")
+time.sleep(2)
+subprocess.call("sudo /etc/init.d/isc-dhcp-server stop")
+subprocess.call("sudo /etc/init.d/networking restart", shell= True)
