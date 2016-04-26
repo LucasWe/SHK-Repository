@@ -11,7 +11,7 @@ User = "lucas"
 Passwort = "123456"
 Schaddresse = "~/.ssh/id_rsa"
 Hostname = "192.168.1.2"
-box = "4"
+box = "1"
 odroid = "3"
 
 #opening an ssh client with the global veriables set above
@@ -22,6 +22,16 @@ def openClient (ip, user, password):
 	print "Ein neuer SSH-Client wurde geoeffnet."
 	return client
 
+#setting a static IP for the Controller
+def controllerIP (boxnumber, cardname):
+	copyDoc("/etc/network/interfaces", "/home/lucas/interfaces_SAFE")
+	interface = open ("/etc/network/interfaces", "w")
+	text="# interfaces(5) file used by ifup(8) and ifdown(8)\nauto lo\n\nauto %s\niface %s inet static\n\taddress 192.168.%s.1\n\tnetmask 255.255.255.0\n\tbroadcast 192.168.1.255\n" % (cardname,cardname,boxnumber)
+	interface.write(text)
+	interface.close()
+	restartNetDev("controller")
+	print "Der Controller hat nun auch eine statische IP (192.168.1.1)."
+	
 #Willkommen heissen
 def welcome ():	
 	print "Willkommen. Dieses Programm wird nun zuallererst den DHCP-Server konfigurieren."
@@ -124,7 +134,7 @@ def changeInterfaceFile (boxnumber, clientnumber, cardname="enp0s3"):
 
 #a function that copies back the Interface file
 def putInterfaces (boxnumber, clientnumber):
-	client = client = openClient(Hostname,User,Passwort)
+	client = openClient(Hostname,User,Passwort)
 	sftp = client.open_sftp()
 	sftp.put("/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber), "/home/lucas/interfaces")
 	sftp.close()	
@@ -135,33 +145,56 @@ def putInterfaces (boxnumber, clientnumber):
 	client.close()
 
 #a function to remotely restart the network device of the client to activate any changes
-def restartNetDev ():
-	client = openClient(Hostname,User,Passwort)	
-	client.exec_command("echo %s | sudo -S -- /etc/init.d/networking restart" %Passwort)
-	print "Die Netzwerkkarte von %s wird nun neu gestartet." % Hostname	
-	#somehow it needs some short time to restart, otherweise if the client is closed
-	#immediatly the natwork device won't restart properly		
-	time.sleep(1)	
-	client.close()
+#wich device is restartet depends on the given string
+def restartNetDev (name):
+	if name == "client":
+		client = openClient(Hostname,User,Passwort)	
+		client.exec_command("echo %s | sudo -S -- /etc/init.d/networking restart" %Passwort)
+		print "Die Netzwerkkarte von %s wird nun neu gestartet." % Hostname	
+		#somehow it needs some short time to restart, otherweise if the client is closed
+		#immediatly the natwork device won't restart properly		
+		time.sleep(1)	
+		client.close()
+	if name == "controller":
+		os.system("sudo /etc/init.d/networking restart")
+		print "Die Netzwerkkarte des Controllers wurde neugestartet."
 
 #a control function for the validation of the Ip change
 def controlIP ():
 	print "Momentan bin ich nutzlos"
 	
-	
+
+#a function, that waits till the client has got its IP
+def wait4Client ():
+	arptext = ""
+	inti = 0
+	clientip = ""
+	while clientip != "192.168.1.2":	
+		arptext = subprocess.check_output(["arp -a"],shell=True)
+		clientip = re.search(r"192.168.1.2",arptext)
+		try: 
+			clientip = clientip.group()
+		
+		except:
+			print "Client ist noch nicht verbunden."
+		inti = inti + 1
+		time.sleep(1)
+		print "Zeit seit dem Start des DHCP-Servers: %i Sekunden" % inti
+		if inti >= 15:
+			print "Ein Verbindungsaufbau war nicht moeglich (timeout)."			
+			serverStop()
+			sys.exit()
+
 
 #Here the main program is starting
 welcome()
 host("192.168.1.1", "controller",getMac())
 serverStart()
-	#we have to sleep for a sec, because the clients have to get their IP
-print "Beginne zu schlafen."
-time.sleep(8)
-print "Stoppe zu schlafen."
+wait4Client()
 changeInterfaceFile (box,odroid,"enp0s3")
-restartNetDev()
+restartNetDev("client")
 serverStop()
-
+controllerIP(box,"enp0s3")
 
 #this will return the former config to the DHCP Server
 #copyDoc("/home/lucas/Schreibtisch/config 1.2", "/etc/dhcp/dhcpd.conf")
