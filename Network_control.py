@@ -15,49 +15,53 @@ box = "1"
 odroid = "3"
 clientnumber = "1"
 
-#I need to add a function, that sets up the config of the DHCP-Server (Subnetz, given Ips, usw.)!!
+#--------------------------------------
+#Table of Content
 
-#a function that asks the user for the boxnumber an the number of connected odroids
-def setup ():
-	print "Die Nummer der Box kann von 0 bis 9 gehen."	
-	boxnumber = raw_input("Bitte geben sie die Nummer der Box ein (default= 1): ")
-	print "Die Anzahl der Odroids kann von 1 bis 64 gehen."	
-	clientnum = raw_input("Bitte geben sie die Anzahl der angeschlossenen Odroids an: ")
-	inti = 0	
-	while inti <= 9:	
-		if boxnumber == "%i" % inti:
-			box=boxnumber
-		inti = inti +1
-	inti = 1	
-	while inti <= 64:
-		if clientnum == "%i" % inti:
-			clientnumber = clientnum
-			
-		inti = inti +1
+#1) Basic functions
+#2) DHCP-Server setup
+#3) Controller functions
+#4) Machine-User Interaction
+#5) direct SSH-functions
+#6) Client functions (indirect ssh)
+#7) Main program
+#--------------------------------------
 
-#opening an ssh client with the global veriables set above
-def openClient (ip, user, password):
-	client = paramiko.SSHClient()
-	client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-	client.connect(ip, username=user, password=password)
-	print "Ein neuer SSH-Client wurde geoeffnet."
-	return client
+#--------------------------------------------------------
+#1) Basic functions for editing an manipulating texfiles
+#--------------------------------------------------------
 
-#setting a static IP for the Controller
-def controllerIP (boxnumber, cardname):
-	copyDoc("/etc/network/interfaces", "/home/lucas/interfaces_SAFE")
-	interface = open ("/etc/network/interfaces", "w")
-	text="# interfaces(5) file used by ifup(8) and ifdown(8)\nauto lo\n\nauto %s\niface %s inet static\n\taddress 192.168.%s.1\n\tnetmask 255.255.255.0\n\tbroadcast 192.168.1.255\n" % (cardname,cardname,boxnumber)
-	interface.write(text)
-	interface.close()
-	restartNetDev("controller")
-	print "Der Controller hat nun auch eine statische IP (192.168.1.1)."
-	
-#Willkommen heissen
-def welcome ():	
-	print "Willkommen. Dieses Programm wird nun zuallererst den DHCP-Server konfigurieren."
-	print "Mal sehen..."
-	print "Danach wird einem Netzwerkteilnehmer eine statische IP zugewiesen."
+# a function to write a given text in a text file
+def writeFile (text, direction):
+	if text == "":
+		print "Der gelesene Text ist leer."
+		print "Es wurde nicht geschrieben!"
+		return
+	textfile = open(direction, "w")
+	textfile.write(text)
+	textfile.close()
+
+#a function to safe the config of the DHCP-Server
+def saveConfig (digits=50):
+	print "Die Config-Datei wird nun gespeichert."
+	copyDoc("/etc/dhcp/dhcpd.conf","/etc/dhcp/dhcpd_SAFE.conf",digits)
+
+#a function to copy a text document (digits therefore is like the velocity of the Process)
+def copyDoc (readDocAddress, writeDocAddress, digits=50):
+	print "%s wird nun in das Dokument %s kopiert." % (readDocAddress, writeDocAddress)
+	readDoc = open(readDocAddress,"r")
+	writeDoc = open(writeDocAddress,"w")
+	while 1:
+		text= readDoc.read(digits)
+		if text == "":
+			break
+		writeDoc.write(text)
+	writeDoc.close()
+	readDoc.close()
+
+#-----------------------------------------------
+#2) functions tha concern the DHCP-Server Setup
+#-----------------------------------------------
 
 # funtion to start or restart the DHCP server
 def serverRestart ():
@@ -72,48 +76,31 @@ def serverStart ():
 def serverStop():
 	os.system("sudo /etc/init.d/isc-dhcp-server stop")
 
-#a function to find out the Controller MAC (mac will be returned as a string)
-def getMac ():
-	ifconfigText = subprocess.check_output(["ifconfig"], shell=True)
-	macObj = re.search(r"[0-9a-z][0-9a-z]:[0-9a-z][0-9a-z]:[0-9a-z][0-9a-z]:[0-9a-z][0-9a-z]:[0-9a-z][0-9a-z]:[0-9a-z][0-9a-z]", ifconfigText)
-	mac = macObj.group()
-	print "Die MAC-Addresse des Controllers ist: %s." % mac
-	return mac
 
-#a function to safe the config of the DHCP-Server
-def saveConfig (digits=50):	
-	print "Die Config-Datei wird nun gespeichert."	
-	copyDoc("/etc/dhcp/dhcpd.conf","/etc/dhcp/dhcpd_SAFE.conf",digits)
+#I need to add a function, that sets up the config of the DHCP-Server (Subnetz, given Ips, usw.)!!
 
-#a function to copy a text document (digits therefore is like the velocity of the Process)
-def copyDoc (readDocAddress, writeDocAddress, digits=50):
-	print "%s wird nun in das Dokument %s kopiert." % (readDocAddress, writeDocAddress)	
-	readDoc = open(readDocAddress,"r")
-	writeDoc = open(writeDocAddress,"w")	
-	while 1:
-		text= readDoc.read(digits)
-		if text == "":
-			break
-		writeDoc.write(text)
-	writeDoc.close()
-	readDoc.close()
-	
+#a funtion to end the lease of the IP for the client
+def leasesdelete ():
+	leer =""
+	writeFile(leer, "/var/lib/dhcp/dhcpd.leases")
+	print "Die leases des DHCP-Servers wurden geloescht."
+
 #a function to give a device a static IP from the DHCP
 def host (ip, name, mac):
 	print "Wir werden nun die Config aendern und eine Einstellung vornehmen."
 	#at first the config is saved in /etc/dhcp/dhcpd_SAFE.conf
 	saveConfig()
-	
-	#Now we change read the current config	
-	config = open("/etc/dhcp/dhcpd.conf","r")	
+
+	#Now we change read the current config
+	config = open("/etc/dhcp/dhcpd.conf","r")
 	print "Dem Geraet mit der MAC %s soll nun die IP %s\ngegeben werden." % (mac, ip)
 	givenText = config.read()
 	config.close()
-	
+
 	#Now we read the config and test if the is free and if true we add the new "host"-party
-	if givenText.find(mac)==-1:	
-		config = open("/etc/dhcp/dhcpd.conf","w")	
-		newText = "\nhost %s {\n   hardware ethernet %s;\n   fixed-address %s;\n}" %(name, 			mac, ip)	
+	if givenText.find(mac)==-1:
+		config = open("/etc/dhcp/dhcpd.conf","w")
+		newText = "\nhost %s {\n   hardware ethernet %s;\n   fixed-address %s;\n}" %(name, 			mac, ip)
 		Text = givenText+newText
 		config.write(Text)
 		config.close()
@@ -122,109 +109,161 @@ def host (ip, name, mac):
 	elif not givenText.find(mac)==-1:
 		print "Die MAC-Addresse ist bereits einer IP zugeordnet.\nDie Config wurde nicht geaendert."
 
-"""#a function to open a ssh to another client
-def sshConnect (name="id_rsa"):
+#a function, that waits till the client has got its IP
+def wait4Client ():
+	inti = 0
+	clientip = ""
+	while clientip != "192.168.1.2":
+		leases = open ("/var/lib/dhcp/dhcpd.leases", "r")
+		leasestext = leases.read()
+		clientip = re.search(r"192.168.1.2",leasestext)
+		try:
+			clientip = clientip.group()
+
+		except:
+			print "Client ist noch nicht verbunden (Versuch %i/15)." % inti
+		inti = inti + 1
+		time.sleep(1)
+		leases.close()
+		if clientip == "192.168.1.2":
+			print "Der Client hat sich gerade verbunden."
+		if inti >= 15:
+			print "Ein Verbindungsaufbau war nicht moeglich (timeout)."
+			serverStop()
+			undo()
+			sys.exit()
+
+
+
+#--------------------------------------------
+#3) functions that happen on the Controller
+#--------------------------------------------
+
+#setting a static IP for the Controller
+def controllerIP (boxnumber, cardname):
+	copyDoc("/etc/network/interfaces", "/home/lucas/interfaces_SAFE")
+	text="# interfaces(5) file used by ifup(8) and ifdown(8)\nauto lo\n\nauto %s\niface %s inet static\n\taddress 192.168.%s.1\n\tnetmask 255.255.255.0\n\tbroadcast 192.168.1.255\n" % (cardname,cardname,boxnumber)
+	writeFile(text,"/etc/network/interfaces")
+	restartNetDev("controller")
+	print "Der Controller hat nun auch eine statische IP (192.168.1.1)."
+
+#a function to find out the Controller MAC (mac will be returned as a string)
+def getMac ():
+	ifconfigText = subprocess.check_output(["ifconfig"], shell=True)
+	macObj = re.search(r"[0-9a-z][0-9a-z]:[0-9a-z][0-9a-z]:[0-9a-z][0-9a-z]:[0-9a-z][0-9a-z]:[0-9a-z][0-9a-z]:[0-9a-z][0-9a-z]", ifconfigText)
+	mac = macObj.group()
+	print "Die MAC-Addresse des Controllers ist: %s." % mac
+	return mac
+
+# a function to undo the changes on the controller
+def undo ():
+	copyfile("/home/lucas/Schreibtisch/interfaces", "/etc/network/interfaces")
+	time.sleep(2)
+	subprocess.call("sudo /etc/init.d/isc-dhcp-server stop")
+	subprocess.call("sudo /etc/init.d/networking restart", shell= True)
+
+#---------------------------------------------
+#4) function for the machine-user-interaction
+#---------------------------------------------
+
+#a function that asks the user for the boxnumber an the number of connected odroids
+def getBoxNumber ():
+	print "Die Nummer der Box kann von 0 bis 9 gehen."
+	boxnumber = raw_input("Bitte geben sie die Nummer der Box ein (default= 1): ")
+	print "Die Anzahl der Odroids kann von 1 bis 64 gehen."
+	clientnum = raw_input("Bitte geben sie die Anzahl der angeschlossenen Odroids an: ")
+	inti = 0
+	while inti <= 9:
+		if boxnumber == "%i" % inti:
+			box=boxnumber
+		inti = inti +1
+	inti = 1
+	while inti <= 64:
+		if clientnum == "%i" % inti:
+			clientnumber = clientnum
+
+		inti = inti +1
+
+#Willkommen heissen
+def welcome ():
+	print "Willkommen. Dieses Programm wird nun zuallererst den DHCP-Server konfigurieren."
+	print "Mal sehen..."
+	print "Danach wird einem Netzwerkteilnehmer eine statische IP zugewiesen."
+
+#--------------------------------------------------
+#5) functions that use the ssh connection directly
+#--------------------------------------------------
+
+
+#opening an ssh client with the global veriables set above
+
+def openClient (ip, user, password):
 	client = paramiko.SSHClient()
-	myKey = os.path.expanduser("~/.ssh/%s" % name)
 	client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-	#client.connect("192.168.1.2", username="lucas", key_filename=myKey)
-	client.connect("192.168.1.2", username="lucas", password="123456")
-	print "Der Controller hat sich nun mit dem Teilnehmer verbunden."
-	client.close()"""
+	client.connect(ip, username=user, password=password)
+	#print "Ein neuer SSH-Client wurde geoeffnet."
+	return client
 
 #a function, that copies the Teilnehmers interface file to a local path
-def getInterface (boxnumber, clientnumber):		
-	client = openClient(Hostname,User,Passwort)	
+def getInterface (boxnumber, clientnumber):
+	client = openClient(Hostname,User,Passwort)
 	sftp = client.open_sftp()
 	sftp.get("/etc/network/interfaces", "/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber))
 	sftp.close()
 	client.close()
 
+#a function that copies the Interface file back to the client
+def putInterfaces (boxnumber, clientnumber):
+	client = openClient(Hostname,User,Passwort)
+	sftp = client.open_sftp()
+	sftp.put("/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber), "/home/lucas/interfaces")
+	sftp.close()
+	client.close()
+
+	client = client = openClient(Hostname,User,Passwort)
+	stdin, stdout, stderr = client.exec_command("echo %s | sudo -S -- mv /home/lucas/interfaces /etc/network/interfaces" % Passwort)
+	client.close()
+
+#------------------------------------------------------------------------------------
+#6) functions, which happen only on the Client Odroid (also using ssh, but indirect)
+#------------------------------------------------------------------------------------
+
 #a function, that changes the interface-file on the Controller to a static IP
 #assuming that the network card is named enp0s3
 #it also copies the interface file into a safety file
 def changeInterfaceFile (boxnumber, clientnumber, cardname="enp0s3"):
-	getInterface(boxnumber,clientnumber)	
+	getInterface(boxnumber,clientnumber)
 	copyDoc("/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber), "/home/lucas/interfaces.%s.%s_SAFE" % (boxnumber,clientnumber))
 	interface = open ("/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber), "w")
 	text="# interfaces(5) file used by ifup(8) and ifdown(8)\nauto lo\n\nauto %s\niface %s inet static\n\taddress 192.168.%s.%s\n\tnetmask 255.255.255.0\n\tbroadcast 192.168.1.255\n" % (cardname,cardname,boxnumber,clientnumber)
 	interface.write(text)
 	interface.close()
 	putInterfaces(boxnumber, clientnumber)
-	
-
-#a function that copies back the Interface file
-def putInterfaces (boxnumber, clientnumber):
-	client = openClient(Hostname,User,Passwort)
-	sftp = client.open_sftp()
-	sftp.put("/home/lucas/interfaces.%s.%s" % (boxnumber,clientnumber), "/home/lucas/interfaces")
-	sftp.close()	
-	client.close()
-		
-	client = client = openClient(Hostname,User,Passwort)
-	stdin, stdout, stderr = client.exec_command("echo %s | sudo -S -- mv /home/lucas/interfaces /etc/network/interfaces" % Passwort)
-	client.close()
 
 #a function to remotely restart the network device of the client to activate any changes
 #wich device is restartet depends on the given string
 def restartNetDev (name):
 	if name == "client":
-		client = openClient(Hostname,User,Passwort)	
+		client = openClient(Hostname,User,Passwort)
 		client.exec_command("echo %s | sudo -S -- /etc/init.d/networking restart" %Passwort)
-		print "Die Netzwerkkarte von %s wird nun neu gestartet." % Hostname	
+		print "Die Netzwerkkarte von %s wird nun neu gestartet." % Hostname
 		#somehow it needs some short time to restart, otherweise if the client is closed
-		#immediatly the natwork device won't restart properly		
-		time.sleep(1)	
+		#immediatly the natwork device won't restart properly
+		time.sleep(1)
 		client.close()
 	if name == "controller":
 		os.system("sudo /etc/init.d/networking restart")
 		print "Die Netzwerkkarte des Controllers wurde neugestartet."
 
-#a control function for the validation of the Ip change
-def controlIP ():
-	print "Momentan bin ich nutzlos"
-	
 
-#a function, that waits till the client has got its IP
-def wait4Client ():
-	inti = 0
-	clientip = ""
-	while clientip != "192.168.1.2":	
-		leases = open ("/var/lib/dhcp/dhcpd.leases", "r")
-		leasestext = leases.read()
-		clientip = re.search(r"192.168.1.2",leasestext)
-		try: 
-			clientip = clientip.group()
-		
-		except:
-			print "Client ist noch nicht verbunden (Versuch %i/15)." % inti
-		inti = inti + 1
-		time.sleep(1)
-		leases.close()
-		if inti >= 15:
-			print "Ein Verbindungsaufbau war nicht moeglich (timeout)."			
-			serverStop()
-			sys.exit()
 
-#a funtion to end the lease of the IP for the client
-def leasesdelete ():
-	leasestext = open ("/var/lib/dhcp/dhcpd.leases", "w")
-	leer =""
-	leasestext.write(leer)
-	leasestext.close()
-	print "Die leases des DHCP-Servers wurden geloescht."
+#-------------------------------------
+#7) Here the main program is starting
+#-------------------------------------
 
-# a function to undo the changes on the controller
-def undo ():	
-	copyfile("/home/lucas/Schreibtisch/interfaces", "/etc/network/interfaces")
-	time.sleep(2)
-	subprocess.call("sudo /etc/init.d/isc-dhcp-server stop")
-	subprocess.call("sudo /etc/init.d/networking restart", shell= True)
-
-#Here the main program is starting
 welcome()
 host("192.168.%s.1" % box, "controller",getMac())
-setup()
+getBoxNumber()
 serverStart()
 wait4Client()
 changeInterfaceFile (box,odroid,"enp0s3")
@@ -238,8 +277,4 @@ controllerIP(box,"enp0s3")
 #this will return the former config to the DHCP Server
 #copyDoc("/home/lucas/Schreibtisch/config 1.2", "/etc/dhcp/dhcpd.conf")
 
-#Was passiert denn nun?
 
-#configure the DHCP-Server, that it will give the Controller one static IP
-#Server starten, damit die IP-Addressen bezogen werden koennen
-#os.system("sudo /etc/init.d/isc-dhcp-server start")
